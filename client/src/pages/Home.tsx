@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Loader, Card, FormField } from "../components"
+import { CardProps } from "../components/Card"
 interface PostProps {
   _id: string
 }
@@ -7,13 +8,13 @@ interface RenderCardsProps {
   data: PostProps[]
   title: string
 }
-
+const API_URL = import.meta.env.VITE_API_URL
 const RenderCards = ({ data, title }: RenderCardsProps): JSX.Element => {
   if (data.length > 0) {
     return (
       <>
         {data.map((post) => (
-          <Card key={post._id} {...(post as any)} />
+          <Card key={post._id} {...(post as CardProps)} />
         ))}
       </>
     )
@@ -24,9 +25,56 @@ const RenderCards = ({ data, title }: RenderCardsProps): JSX.Element => {
 }
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [allPosts, setAllPosts] = useState(null);
+  const [allPosts, setAllPosts] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState([])
+  const [searchTimeout, setSearchTimeout] = useState(0)
 
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        setLoading(true)
+
+        const response = await fetch(API_URL + "/post", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        console.log(response)
+        if (response.ok) {
+          const results = await response.json()
+          setAllPosts(results.data.reverse())
+        }
+      } catch (error) {
+        console.error(error)
+        alert(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPosts()
+  }, [])
+
+  const handleSearchChange = (e: any) => {
+    clearTimeout(searchTimeout)
+
+    setSearchText(e.target.value)
+
+    setSearchTimeout(
+      setTimeout(() => {
+        const searchResults = allPosts.filter(
+          (item: CardProps) =>
+            item.name.toLowerCase().includes(searchText.toLowerCase()) ||
+            item.prompt.toLowerCase().includes(searchText.toLowerCase())
+        )
+
+        setSearchResults(searchResults)
+      }, 500)
+    )
+  }
   return (
     <section className="max-w-7xl mx-auto" >
       <div>
@@ -39,7 +87,7 @@ export default function Home() {
             placeholder="Search posts ..."
             type="text"
             value={searchText}
-            handleChange={(e) => setSearchText(e.target.value)}
+            handleChange={handleSearchChange}
           />
         </div>
         <div className="mt-10">
@@ -56,9 +104,9 @@ export default function Home() {
               )}
               <div className="grid lg:grid-cols-4 sm:grid-col-3 xs:grid-cols-2 grid-cols-1 gap-3">
                 {searchText ? (
-                  <RenderCards data={[]} title="No results found" />
+                  <RenderCards data={searchResults} title="No results found" />
                 ) : (
-                  <RenderCards data={[]} title="No posts found" />
+                  <RenderCards data={allPosts} title="No posts found" />
                 )}
               </div>
             </>
